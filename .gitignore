@@ -1,0 +1,20 @@
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# ML models
+*.pt
+*.onnx
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
+# Environment
+.env
+.env.*
+
+# macOS
+.DS_Store

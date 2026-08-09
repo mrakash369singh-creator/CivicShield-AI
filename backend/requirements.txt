@@ -1,0 +1,15 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+alembic
+databases
+pydantic
+python-multipart
+aiofiles
+requests
+typing-extensions
+python-dotenv
+geopy
+opencv-python-headless
+numpy
+ultralytics
