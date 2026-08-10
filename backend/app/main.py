@@ -7,9 +7,17 @@ import os
 
 app = FastAPI(title='CivicShield AI')
 
+# Configure CORS origins via FRONTEND_ORIGIN environment variable.
+# Accept a comma-separated list of origins, or leave unset to allow all ('*').
+frontend_origins = os.environ.get('FRONTEND_ORIGIN')
+if frontend_origins:
+    origins = [o.strip() for o in frontend_origins.split(',') if o.strip()]
+else:
+    origins = ['*']
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.environ.get('FRONTEND_ORIGIN','*')],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*']

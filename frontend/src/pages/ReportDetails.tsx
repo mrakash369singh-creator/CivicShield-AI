@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react'
 import axios from 'axios'
-import { useParams } from 'react-router-dom'
+import { useParams, Link } from 'react-router-dom'
 import { API_BASE_URL } from '../config'
+import { MapContainer, TileLayer, Marker } from 'react-leaflet'
+import L from 'leaflet'
 
 const statusSteps = ['REPORTED', 'VERIFIED', 'ASSIGNED', 'IN PROGRESS', 'RESOLVED']
 
@@ -156,6 +158,34 @@ export default function ReportDetails() {
   const slaClass = slaBadge(slaStatus)
   const priorityClass = priorityBadge(currentPriority)
 
+  const openInMaps = () => {
+    if (report?.latitude == null || report?.longitude == null) return
+    const lat = report.latitude
+    const lon = report.longitude
+    const mapUrl = `https://www.google.com/maps?q=${lat},${lon}`
+    window.open(mapUrl, '_blank', 'noopener')
+  }
+
+  const handleQuickAssign = async () => {
+    // Try to auto-select department by name and assign
+    if (!report) return
+    const recName = report.recommended_department
+    if (!recName) return
+    const match = departments.find((d) => d.name && d.name.toLowerCase() === String(recName).toLowerCase())
+    if (match) {
+      setSelectedDept(String(match.id))
+      try {
+        await axios.post(`${API_BASE_URL}/api/reports/${report.id}/assign`, new URLSearchParams({ department_id: String(match.id) }))
+        await refreshReport()
+        await updateTimeline()
+      } catch (err) {
+        alert('Assignment failed')
+      }
+    } else {
+      alert('Recommended department not found in department list. Please assign using the Authority Actions card.')
+    }
+  }
+
   if (!report) {
     return <div className="min-h-screen bg-[#020b16] p-6 text-slate-100">Loading report details…</div>
   }
@@ -163,47 +193,46 @@ export default function ReportDetails() {
   return (
     <div className="min-h-screen bg-[#020b16] text-slate-100">
       <div className="mx-auto max-w-7xl px-4 py-8 md:px-6 lg:px-8">
-        <header className="glass-panel rounded-[30px] border border-slate-700/80 p-6 shadow-[0_24px_60px_rgba(15,23,42,0.3)] md:p-8">
-          <div className="flex flex-col gap-5 md:flex-row md:items-end md:justify-between">
-            <div className="space-y-4">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.28em] text-cyan-300">Incident Intelligence</div>
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="rounded-full border border-slate-600 bg-slate-900/80 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-200">
-                  {report.issue_type || 'Unknown'}
-                </span>
-                <span className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${statusBadge(currentStatus)}`}>
-                  {currentStatus}
-                </span>
-                <span className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] ${priorityClass}`}>
-                  {currentPriority}
-                </span>
+        <header className="glass-panel rounded-[20px] border border-slate-700/80 p-6 shadow-[0_14px_40px_rgba(2,6,23,0.6)] md:p-8">
+          <div className="flex items-start justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <Link to="/reports" className="text-sm font-medium text-slate-300 hover:text-white">← Back to Reports</Link>
+              <div>
+                <div className="text-[12px] font-semibold uppercase tracking-[0.18em] text-slate-400">Report</div>
+                <div className="mt-1 flex items-center gap-3">
+                  <h1 className="text-2xl font-bold text-white">{report.external_id || `#${report.id}`}</h1>
+                  <div className="text-lg font-semibold text-slate-200">{report.issue_type || 'Issue'}</div>
+                  <div className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${priorityClass}`}>{currentPriority}</div>
+                  <div className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${slaClass}`}>{slaStatus}</div>
+                </div>
+                <div className="mt-2 text-sm text-slate-400">Location: <span className="font-mono text-slate-100">{locationText}</span></div>
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-4">
-                <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Report ID</div>
-                <div className="mt-2 text-xl font-semibold text-white">{report.external_id || `#${report.id}`}</div>
-              </div>
-              <div className="rounded-2xl border border-slate-700 bg-slate-900/70 p-4">
-                <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Confidence</div>
-                <div className="mt-2 text-xl font-semibold text-white">{confidencePct != null ? `${confidencePct}%` : 'N/A'}</div>
-              </div>
+            <div className="flex items-center gap-3">
+              <button onClick={openInMaps} className="inline-flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-900/80 px-4 py-2 text-sm font-semibold text-cyan-100 hover:border-cyan-400/40 hover:text-cyan-100">
+                ↗ Open in Maps
+              </button>
             </div>
           </div>
 
-          <div className="mt-6 grid gap-3 md:grid-cols-3">
-            <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
-              <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Location</div>
-              <div className="mt-2 font-mono text-sm text-slate-100">{locationText}</div>
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-4">
+            <div className="rounded-[18px] border border-slate-700 bg-slate-900/60 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Confidence</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{confidencePct != null ? `${confidencePct}%` : 'N/A'}</div>
             </div>
-            <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
-              <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Reported</div>
-              <div className="mt-2 text-sm text-slate-100">{formatDate(report.created_at)}</div>
+            <div className="rounded-[18px] border border-slate-700 bg-slate-900/60 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Severity</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{severityValue != null ? `${severityValue}/10` : 'N/A'}</div>
             </div>
-            <div className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4">
-              <div className="text-[10px] uppercase tracking-[0.22em] text-slate-400">Assigned Dept</div>
-              <div className="mt-2 text-sm text-slate-100">{assignedDepartment}</div>
+            <div className="rounded-[18px] border border-slate-700 bg-slate-900/60 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Safety Risk</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{report.safety_risk || 'N/A'}</div>
+            </div>
+            <div className="rounded-[18px] border border-slate-700 bg-slate-900/60 p-4">
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Priority Score</div>
+              <div className="mt-2 text-2xl font-semibold text-white">{priorityScore != null ? `${priorityScore}/100` : 'N/A'}</div>
+              <div className="mt-1 text-sm text-slate-300">{currentPriority}</div>
             </div>
           </div>
         </header>
@@ -270,7 +299,7 @@ export default function ReportDetails() {
                   <p className="mt-3 text-sm leading-6 text-slate-300">{departmentReason}</p>
                 </div>
 
-                <button className="mt-4 w-full rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 px-4 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-cyan-100 transition hover:brightness-110">
+                <button onClick={handleQuickAssign} className="mt-4 w-full rounded-2xl border border-cyan-500/30 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 px-4 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-cyan-100 transition hover:brightness-110">
                   Confirm Assignment
                 </button>
               </div>
@@ -439,8 +468,17 @@ export default function ReportDetails() {
             <div className="glass-panel rounded-[30px] border border-slate-700/80 p-5">
               <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-400">Location</div>
               <div className="mt-3 font-mono text-lg text-white">{locationText}</div>
-              <button className="mt-4 rounded-xl border border-slate-600 bg-slate-900/80 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-200 hover:border-cyan-400/40 hover:text-cyan-100">
-                Open in Map
+              {report.latitude != null && report.longitude != null && (
+                <div className="mt-3 overflow-hidden rounded-lg border border-slate-700 bg-slate-900/60" style={{ height: 160 }}>
+                  <MapContainer center={[report.latitude, report.longitude]} zoom={15} scrollWheelZoom={false} style={{ height: '100%', width: '100%' }}>
+                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                    <Marker position={[report.latitude, report.longitude]} />
+                  </MapContainer>
+                </div>
+              )}
+
+              <button onClick={openInMaps} className="mt-4 inline-flex items-center gap-2 rounded-xl border border-slate-600 bg-slate-900/80 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-100 hover:border-cyan-400/40 hover:text-cyan-100">
+                ↗ Open in Maps
               </button>
             </div>
 
