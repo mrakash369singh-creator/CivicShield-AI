@@ -10,6 +10,6 @@ requests
 typing-extensions
 python-dotenv
 geopy
-#opencv-python-headless
+opencv-python-headless
 numpy
-#ultralytics
+ultralytics
