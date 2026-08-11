@@ -11,5 +11,5 @@ typing-extensions
 python-dotenv
 geopy
 #opencv-python-headless
-#numpy
+numpy
 #ultralytics
